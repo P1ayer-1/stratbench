@@ -1,8 +1,15 @@
-# predkit
+# stratbench
 
-Record, replay and backtest strategies on **Kalshi** and **Polymarket**, and
-run them on paper (or, deliberately, live) with a risk veto in front of
-every order.
+A strategy-testing bench with two toolkits: **predkit** for prediction
+markets (Kalshi, Polymarket) and **perpkit** for crypto perpetual futures
+(BloFin, Hyperliquid, Binance/Bybit liquidation feeds), plus a team of
+research-lab agents for Claude Code. Both toolkits record raw venue data
+first, replay it, and backtest net of transcribed fees with honest controls.
+
+**predkit** records, replays and backtests strategies on **Kalshi** and
+**Polymarket**, and runs them on paper (or, deliberately, live) with a risk
+veto in front of every order. Most of this README describes it; perpkit has
+its own section, [perpkit (crypto perpetual futures)](#perpkit-crypto-perpetual-futures).
 
 Every instrument on these venues is a binary contract priced between 0 and
 1 that resolves at a known time from the venue's own source. Max loss is
@@ -13,10 +20,15 @@ shapes the whole package.
 > licence, with no warranty of any kind. Nothing in this repository is
 > financial, investment, legal or tax advice, and no result it produces is a
 > promise of future returns. Trading prediction markets can lose all the
-> money you put in. Access to prediction markets is restricted or prohibited
-> in many jurisdictions: **you are responsible for following each venue's
-> terms of service and the laws where you live.** The geofence in this
-> toolkit is a floor, not legal clearance (see [Live trading](#live-trading)).
+> money you put in. **Leveraged perpetual futures are high risk: a leveraged
+> position can be liquidated and lose all of its margin in minutes, and
+> funding, fees and spreads accrue whether or not a trade works.** Access to
+> prediction markets and to crypto derivatives venues is restricted or
+> prohibited in many jurisdictions: **you are responsible for following each
+> venue's terms of service and the laws where you live.** The geofence in
+> predkit is a floor, not legal clearance (see [Live trading](#live-trading)),
+> and perpkit has no geofence at all. The strategies shipped in either
+> toolkit are teaching examples with no known edge.
 
 ## Contents
 
@@ -28,6 +40,7 @@ shapes the whole package.
 - [Adding a strategy](#adding-a-strategy)
 - [Fee tables](#fee-tables)
 - [What is verified and what is not](#what-is-verified-and-what-is-not)
+- [perpkit (crypto perpetual futures)](#perpkit-crypto-perpetual-futures)
 - [Research lab (Claude Code agents)](#research-lab-claude-code-agents)
 - [Licence](#licence)
 
@@ -113,19 +126,30 @@ predkit/
                     polymarket.py (Gamma, CLOB, data API, WS; py-clob-client for orders)
                     binance_reference.py (public book ticker, a leader feed, never a label)
   strategies/       Protocols + registry; simple_maker/ and simple_taker/ examples
+perpkit/            crypto perpetual futures; see its own section below
 examples/
-  backtest_example.py   offline, synthetic end-to-end backtest
-tests/              hand-computed values; no network, no credentials
+  backtest_example.py         offline, synthetic end-to-end predkit backtest
+  perpkit_factor_example.py   offline, synthetic perpkit factor-panel run
+tests/              hand-computed values; no network, no credentials (perpkit's in tests/perpkit/)
 ```
 
 ## Install
 
-Python 3.12 or newer. Use a fresh environment (venv, conda or micromamba):
+Python 3.12 or newer. Use a fresh environment (venv, conda or micromamba).
+One distribution, `stratbench`, ships both packages (`import predkit`,
+`import perpkit`):
+
+```
+pip install stratbench                              # predkit: httpx, websockets, cryptography, psutil
+pip install "stratbench[perps]"                     # + perpkit's analysis dependencies (numpy)
+pip install "stratbench[polymarket]"                # only for live Polymarket orders (py-clob-client)
+```
+
+From a clone of https://github.com/P1ayer-1/stratbench, for development:
 
 ```
 python -m venv .venv && . .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"                             # httpx, websockets, cryptography, psutil + pytest
-pip install -e ".[polymarket]"                      # only for live Polymarket orders (py-clob-client)
+pip install -e ".[perps,dev]"                       # both toolkits + pytest
 python -m pytest -q                                 # no network, no keys needed
 ```
 
@@ -372,6 +396,243 @@ price.
   delivered is still applied late. Filter crossed or locked touches before
   treating one as a price.
 - The maker fill model is a bracket, not a truth. Only live fills narrow it.
+
+## perpkit (crypto perpetual futures)
+
+perpkit records, replays and backtests crypto perpetual futures. It is the
+same philosophy as predkit applied to a leveraged, funded, liquidatable
+instrument: archive every venue message verbatim before parsing it, rebuild
+anything derived from that archive, price every verdict with transcribed
+fees, and put a risk veto that imports nothing in front of any order.
+
+What it covers:
+
+- **Recorders**, each a supervised, reconnecting loop with a deadline on
+  every message:
+  - `perpkit.record`: BloFin order book (`books`, 200 levels), trades and
+    funding per instrument over one websocket each, plus open interest by REST;
+    optional labelled feature rows (order-book imbalance, order flow,
+    microprice, volatility), written only after the label horizon has closed.
+  - `perpkit.record_oi`: BloFin open interest and mark price by REST, added to
+    a run that is already going.
+  - `perpkit.record_hyperliquid`: Hyperliquid books, trades and asset
+    contexts, plus a liquidation map read from public account positions
+    (the exchange's own `liquidationPx`), under a REST weight budget.
+  - `perpkit.record_liquidations`: Binance's all-market `!forceOrder@arr`
+    stream or Bybit's `allLiquidation.<symbol>` topics, venue-wide.
+- **The raw archive** (`perpkit/rawlog.py`): gzip JSON lines `{t, n, m}`
+  per channel per hour; exclusive-create files (a restart writes `.r001`
+  beside the hour's first file, never appends); a reader that recovers every
+  gzip member of a file torn by a hard kill.
+- **Replay and audits** (`perpkit/analysis/`): `replay` rebuilds feature
+  rows from the archive through the same book, tape and feature engine as
+  live, on the receive clock or the venue's own clock; `audit_raw` reports
+  damaged hours; `recorder_lag` measures how far each socket ran behind the
+  venue's stamps.
+- **Panels and a factor harness**: `panel_blofin` and `panel_hyperliquid`
+  build daily panels in one schema (`perpkit/analysis/panel.py`: rows close at
+  00:00 UTC, funding for day D is what accrued during D). `factor_panel`
+  scores cross-sectional factors as money: non-overlapping holds, cost on
+  turnover, price and funding legs split, a one-day lag by default, and the
+  MEAN of within-date shuffled controls plus the percentile the real book
+  beat. `check_features` tests recorded features against forward moves net
+  of cost, with purged splits.
+- **Fees and risk**: `perpkit/fees.py` (the BloFin ladder, below) and
+  `perpkit/risk.py` (liquidation price, sizing, hard limits, kill switch,
+  a reduce-only path so the veto never blocks getting out).
+- **A teaching example, no known edge**: a delta-neutral funding carry on
+  BloFin (long spot, short perp) with `plan_carry` / `run_carry` /
+  `monitor_carry` / `close_carry`, plus `analysis/funding_carry` (a screen)
+  and `analysis/carry_backtest` (every historical entry, overlap-corrected).
+  It is there to show the plan / execute / monitor split, leg ordering and
+  unwinds on a real two-leg position, not because it makes money.
+
+Hyperliquid support is **read-only**: public market data and public account
+state. There is no Hyperliquid order path.
+
+### Install
+
+```
+pip install "stratbench[perps]"          # or, from a clone: pip install -e ".[perps,dev]"
+```
+
+That is enough for the Hyperliquid and liquidation recorders, replay, the
+audits, the Hyperliquid panel, the factor harness and the example. The
+BloFin websocket recorder, the BloFin panel, the carry screens and the carry
+order paths also need the BloFin Python SDK
+([P1ayer-1/blofin-sdk-python](https://github.com/P1ayer-1/blofin-sdk-python),
+Apache-2.0). Its `setup.py` does not currently package a module (`src/blofin`
+has no `__init__.py`), so `pip install` of it installs nothing importable.
+Until that is fixed upstream, clone it and put its `src/` on the path:
+
+```
+git clone https://github.com/P1ayer-1/blofin-sdk-python
+pip install requests aiohttp                                   # the SDK's own dependencies
+export PYTHONPATH="$PWD/blofin-sdk-python/src"                  # Windows: set PYTHONPATH=%CD%\blofin-sdk-python\src
+```
+
+Nothing in `import perpkit` needs the SDK: the BloFin feed is loaded lazily,
+and the tests that need it skip without it.
+
+### Quickstart
+
+Recording and all public market data need no account and no key. Data goes
+under `./data` (or `PERPKIT_DATA_DIR`, or `--data-dir`).
+
+**1. Record.**
+
+```
+# Hyperliquid: validate the coins live, then record them (no SDK needed)
+python -m perpkit.record_hyperliquid --check --coins BTC,ETH
+python -m perpkit.record_hyperliquid --coins BTC,ETH
+
+# BloFin: disk arithmetic first, then book + trades + funding + open interest
+python -m perpkit.record --list-cost --instruments BTC-USDT,ETH-USDT
+python -m perpkit.record --instruments BTC-USDT,ETH-USDT
+
+# Venue-wide liquidation prints
+python -m perpkit.record_liquidations --check
+python -m perpkit.record_liquidations --venue binance
+```
+
+BloFin data lands in `data/<INST-ID>/raw/<day>/<channel>-<HH>.jsonl.gz`,
+Hyperliquid in `data/hyperliquid/<COIN>/`, liquidation feeds in
+`data/<venue>/<channel>/`. Leave recorders running; stop with Ctrl+C. A
+restart never overwrites what is on disk. Budget roughly 140 MB a day per
+BloFin instrument (`--list-cost` prints the arithmetic).
+
+**2. Replay and audit.**
+
+```
+python -m perpkit.analysis.audit_raw --data-dir data                     # which hours are damaged, if any
+python -m perpkit.analysis.replay --instrument BTC-USDT --date 2026-01-01 --clock exchange
+python -m perpkit.analysis.recorder_lag --date 2026-01-01 --hours      # how far behind the venue each socket ran
+python -m perpkit.analysis.check_features --data-dir data --horizon 900
+```
+
+`replay` regenerates feature rows from the archive; anything you think of
+later can be computed over all the history you recorded. `--clock exchange`
+places events at the venue's own stamps rather than when this process
+received them, which matters because a socket can run tens of seconds behind
+the venue in bursts while staying open and in sequence.
+
+**3. Backtest.**
+
+The offline example builds a synthetic panel in a rigged world (persistent
+funding per coin, random-walk prices) and scores `carry_7` and `mom_14` net
+of cost with a one-day lag and 50 shuffled controls:
+
+```
+python examples/perpkit_factor_example.py
+```
+
+On real data, build a daily panel and score factors on it:
+
+```
+python -m perpkit.analysis.panel_hyperliquid --top 60
+python -m perpkit.analysis.factor_panel --panel data/panel/hyperliquid-daily.csv \
+    --hold-days 7 --top-frac 0.2 --lag 1 --control-seeds 50
+```
+
+Read `pct` (the share of shuffled controls the real book beat) and `alpha`
+before the headline number, and expect `ctrl` to land near minus the cost.
+A factor that does not beat its shuffles net of cost is not an edge. Panels
+built from instruments listed today are survivorship-biased; momentum-shaped
+results are flattered by the coins that are missing.
+
+**4. The carry teaching example (demo account).** Needs the SDK and a BloFin
+demo API key:
+
+```
+export BLOFIN_API_KEY=... BLOFIN_API_SECRET=... BLOFIN_API_PASSPHRASE=...
+python -m perpkit.analysis.funding_carry --top 25                 # screen: does funding cover the round trip?
+python -m perpkit.analysis.carry_backtest --hold-days 14 --top 25 # every historical entry
+python -m perpkit.plan_carry --instrument <INST-ID> --notional 200
+python -m perpkit.run_carry  --instrument <INST-ID> --notional 200             # rehearsal, sends nothing
+python -m perpkit.run_carry  --instrument <INST-ID> --notional 200 --confirm   # demo orders
+python -m perpkit.monitor_carry --instrument <INST-ID>
+python -m perpkit.close_carry --instrument <INST-ID> --confirm
+```
+
+The carry tools need a spot fee row for your tier; only VIP 1 spot fees are
+transcribed (below), so at the default VIP 0 they refuse and say so rather
+than guess.
+
+### Guardrails
+
+Every perpkit order path goes through `perpkit/guardrails.py` before it
+builds a client or reads a key:
+
+- **Dry unless `--confirm`.** Without it, `run_carry` and `close_carry` build
+  the plan from live prices and print every step they would send, and send
+  nothing. The executor itself defaults to `dry_run=True`.
+- **Demo unless `--production`.** Orders go to BloFin's demo-trading host.
+- **`--production --confirm` is refused outright.** There is no override
+  flag and no second step: perpkit ships no production order path. If you
+  decide to trade live, that is a decision to make deliberately, outside this
+  toolkit, after the same code has run end to end on demo. `--production`
+  alone is allowed for the read-only tools (`plan_carry`, `monitor_carry`)
+  and for rehearsals.
+- **No default trades live.** Every recorder, replay and analysis tool is
+  read-only; `plan_carry` and `monitor_carry` have no path to an order
+  endpoint at all.
+- **Keys come only from the environment** (`BLOFIN_API_KEY`,
+  `BLOFIN_API_SECRET`, `BLOFIN_API_PASSPHRASE`), are passed straight to the
+  SDK, and are never logged, written or accepted as command-line arguments.
+  Use a demo key, and a trading-only key without withdrawal permission.
+- **The risk veto** (`perpkit/risk.py`) imports nothing from the package,
+  uses `Decimal`, returns every failing reason, trips a kill switch on
+  realised AND mark-to-market losses or a position drifting toward
+  liquidation, and lets a verified reduce-only order through so the veto
+  never blocks getting out.
+- **Tests need no network, no credentials and no SDK**
+  (`tests/perpkit/test_perp_guardrails.py` pins the rules above).
+
+### Fee tables (BloFin)
+
+Transcribed by hand in `perpkit/fees.py`. **None has been verified against a
+real fill.** An import-time check rejects a ladder that gets worse as the
+tier improves or repeats a tier's rates. Tiers that could not be confirmed
+are absent, not interpolated, and an unknown tier is an error. Fees change:
+re-read BloFin's schedule before trusting a verdict. The default is VIP 0
+(`BLOFIN_VIP_TIER` to change it, only once your account qualifies).
+
+Perpetual futures, fraction of notional per side:
+
+| VIP tier | Maker | Taker | Transcribed | Source |
+|---|---|---|---|---|
+| 0 | 0.0200% | 0.0600% | 2026-09-07 | BloFin published fee schedule (via quoted search results; the site refuses automated fetches), corroborated by an account fee display 2026-09-09 |
+| 1 | 0.0060% | 0.0500% | 2026-09-07 | same |
+| 2 | 0.0040% | 0.0450% | 2026-09-07 | same |
+| 3 | 0.0020% | 0.0425% | 2026-09-09 | account fee display |
+| 4 | not transcribed | not transcribed | | could not be confirmed; absent on purpose |
+| 5 | 0.0000% | 0.0350% | 2026-09-07 | published schedule, corroborated 2026-09-09 |
+
+Spot (for the carry example's spot leg):
+
+| VIP tier | Maker | Taker | Transcribed | Source |
+|---|---|---|---|---|
+| 1 | 0.0350% | 0.0600% | 2026-09-09 | account fee display |
+
+Round trips at VIP 0: 4 bps maker/maker, 8 bps maker/taker, 12 bps
+taker/taker, before spread. There is no maker rebate at any tier, so a
+passive round trip still pays adverse selection when the fee reaches zero.
+The risk veto's edge gate assumes taker/taker. perpkit has no fee table for
+Hyperliquid, Binance or Bybit: it records them, it does not trade them.
+
+### What is verified and what is not (perpkit)
+
+- `risk.liquidation_price` matched BloFin's own reported liquidation price
+  to 0.057% on one small demo position (MMR 0.005, ~6 bps fee term). MMR is
+  tiered by size; `margin_tiers` reads the real tier from the account's own
+  host (demo and production tables differ). Re-check with
+  `risk.compare_to_exchange` at your size.
+- The carry order path has run end to end on BloFin's demo host. It has
+  never sent a production order, and cannot.
+- Parsers are tested against payload shapes read live from each venue's
+  public endpoints; dates are in the module docstrings.
+- The feature rows and labels are regenerable from the archive; the archive
+  is not regenerable from anything. Never delete it to save disk.
 
 ## Research lab (Claude Code agents)
 

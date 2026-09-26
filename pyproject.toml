@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "predkit"
+name = "stratbench"
 version = "0.1.0"
-description = "Record, replay and backtest strategies on Kalshi and Polymarket. Non-custodial, fee-honest."
+description = "Record, replay and backtest strategies on Kalshi and Polymarket (predkit) and crypto perpetual futures (perpkit). Non-custodial, fee-honest."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.12"
@@ -20,6 +20,13 @@ dependencies = [
 # Signing Polymarket orders (EIP-712) for live trading. Not needed to record,
 # replay, backtest or paper trade.
 polymarket = ["py-clob-client>=0.30"]
+# perpkit: crypto perpetual futures (BloFin, Hyperliquid, Binance/Bybit
+# liquidation feeds). numpy backs the analysis tools. The BloFin websocket
+# feed, BloFin REST panels and the carry order paths also need the BloFin
+# Python SDK (github.com/P1ayer-1/blofin-sdk-python, Apache-2.0), which is not
+# listed here because its setup.py does not currently package any module;
+# see "perpkit > Install" in the README.
+perps = ["numpy>=1.26"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 
 [project.scripts]
@@ -30,7 +37,7 @@ predkit-run = "predkit.runner:main"
 predkit-keys = "predkit.keys:main"
 
 [tool.setuptools.packages.find]
-include = ["predkit*"]
+include = ["predkit*", "perpkit*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

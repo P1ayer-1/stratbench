@@ -21,6 +21,26 @@ in every pull request.
   --confirm`, a geofence pass, the user's own key and the risk veto.
 - **Keep the veto import-free.** `risk.py` imports nothing from `predkit`.
 
+## perpkit
+
+The same rules, adapted to perpetual futures:
+
+- **Tests pass with no network, no credentials and no BloFin SDK.** Modules
+  that need the SDK import it lazily; tests that need it use
+  `pytest.importorskip("blofin")`. HTTP clients take an injectable opener;
+  clocks and sockets are injected fakes.
+- **Every order path goes through `perpkit/guardrails.py`**: dry unless
+  `--confirm`, demo unless `--production`, `--production --confirm`
+  refused outright. Do not add an override. Keys come from environment
+  variables only and are never logged.
+- **Keep `perpkit/risk.py` import-free** and in `Decimal`.
+- **One writer per channel per instrument; never append to an archive
+  file.** Recorders take the existing pid locks.
+- **A backtest charges `perpkit/fees.py`, never holds overlap, and reports
+  the mean of its shuffled controls.** Factor scores default to a one-day lag.
+- **No strategy results in docstrings.** Explain why the code is shaped the
+  way it is; do not ship claims that something makes money.
+
 ## Fee rows and venue facts
 
 A new fee tier or venue rule needs a date, a source (URL or document
