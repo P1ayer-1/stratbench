@@ -34,7 +34,7 @@ Work through these and write the answers down:
 4. **Prediction.** Direction, horizon, and rough size (bps for perps, cents
    of YES price for binary contracts), conditional on an observable signal.
 5. **Cost hurdle.** Round-trip cost from the repo's own fee tables
-   (`predkit/fees.py` for prediction markets; the crypto-perps module's fee
+   (`predkit/fees.py` for prediction markets; `perpkit/fees.py`'s fee
    ladder, at the tier actually held, maker or taker, for perps), plus funding
    paid over the hold, spread and slippage at plausible size. The predicted
    edge must clear it, with the arithmetic shown.

@@ -26,7 +26,7 @@ than assuming. Two domains:
 - **Prediction markets** (predkit): binary contracts priced as the YES price,
   a `c*p*(1-p)` fee curve per venue and tier, a raw order-book/trade archive,
   and a maker fill model with optimistic and pessimistic bounds.
-- **Crypto perpetual futures** (a crypto-perps module, if present, otherwise
+- **Crypto perpetual futures** (the repo's perpkit package, plus
   public venue data): maker/taker fee ladders by VIP tier, funding schedules,
   basis, open interest, liquidations (observable on some venues), and public
   L2/trade and kline data (e.g. from Binance, Bybit or Hyperliquid) for daily

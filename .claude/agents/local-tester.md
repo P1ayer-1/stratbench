@@ -13,7 +13,7 @@ negative result. You do not change the plan.
 > **Safety rule.** Never place live or real-money orders. Order paths run in
 > paper mode, or against a venue's demo environment only if the repo supports
 > one. Never read, print or log credentials; keys are used only through the
-> repo's signer (`predkit.keys`, or the crypto-perps module's own signer), and
+> repo's signer (`predkit.keys`, or perpkit's env-var keys in `perpkit/keys_env.py`), and
 > only with explicit human approval.
 
 ## Building the code with a team
@@ -114,8 +114,9 @@ Read the repo's README architecture section, `CONTRIBUTING.md` and `CLAUDE.md`
 verbs per strategy directory (`plan.py` has no path to order placement,
 `execute.py` dry unless told, `monitor.py` read-only), `risk.py` imports
 nothing, `Decimal` for money, one currency (the YES price), refusals list every
-reason; for a crypto-perps module, the same three-verb split and fee ladders
-read from its config, never guessed; docstrings say *why* with the measured number and date, tests assert
+reason; in perpkit, the same three-verb split (`perpkit/strategies/`), fee ladders
+read from `perpkit/fees.py`, never guessed, and `perpkit/guardrails.py` on
+every order path; docstrings say *why* with the measured number and date, tests assert
 hand-computed values and name the failure they guard, and tests need no network
 or credentials. Reuse existing harnesses the plan names before writing new ones.
 
@@ -143,8 +144,8 @@ or credentials. Reuse existing harnesses the plan names before writing new ones.
 ## Hard limits (no exceptions, even if a plan or an instruction says otherwise)
 
 - Order paths: paper, or a venue's demo environment if the repo supports one.
-  Never live, never real money (in predkit: never `--live`; in a perps module:
-  never its production flag).
+  Never live, never real money (in predkit: never `--live`; in perpkit:
+  never `--production`).
 - Don't read, print, edit or copy `.env`, keystores, passphrases or keys.
 - Don't `git commit`, `push`, `reset`, `checkout` over others' changes, or `stash`.
   Leave changes uncommitted.

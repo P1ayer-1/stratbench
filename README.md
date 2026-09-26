@@ -461,14 +461,11 @@ audits, the Hyperliquid panel, the factor harness and the example. The
 BloFin websocket recorder, the BloFin panel, the carry screens and the carry
 order paths also need the BloFin Python SDK
 ([P1ayer-1/blofin-sdk-python](https://github.com/P1ayer-1/blofin-sdk-python),
-Apache-2.0). Its `setup.py` does not currently package a module (`src/blofin`
-has no `__init__.py`), so `pip install` of it installs nothing importable.
-Until that is fixed upstream, clone it and put its `src/` on the path:
+Apache-2.0). It is not on PyPI, so it is not a declared dependency (PyPI
+refuses packages that depend on a git URL); install it from GitHub:
 
 ```
-git clone https://github.com/P1ayer-1/blofin-sdk-python
-pip install requests aiohttp                                   # the SDK's own dependencies
-export PYTHONPATH="$PWD/blofin-sdk-python/src"                  # Windows: set PYTHONPATH=%CD%\blofin-sdk-python\src
+pip install "blofin @ git+https://github.com/P1ayer-1/blofin-sdk-python@v0.1.1"
 ```
 
 Nothing in `import perpkit` needs the SDK: the BloFin feed is loaded lazily,
@@ -640,7 +637,7 @@ Hyperliquid, Binance or Bybit: it records them, it does not trade them.
 subagents that research strategies the way this toolkit backtests them: with
 costs first and goalposts fixed before the data is seen. They cover binary
 prediction markets and crypto perpetual futures (funding, basis, order flow;
-the perps side uses a crypto-perps module if you add one, or public data).
+the perps side uses perpkit and public venue data).
 
 The pipeline, one folder per idea under `research/` (see
 [research/BOARD.md](research/BOARD.md)):

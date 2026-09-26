@@ -23,8 +23,8 @@ polymarket = ["py-clob-client>=0.30"]
 # perpkit: crypto perpetual futures (BloFin, Hyperliquid, Binance/Bybit
 # liquidation feeds). numpy backs the analysis tools. The BloFin websocket
 # feed, BloFin REST panels and the carry order paths also need the BloFin
-# Python SDK (github.com/P1ayer-1/blofin-sdk-python, Apache-2.0), which is not
-# listed here because its setup.py does not currently package any module;
+# Python SDK (github.com/P1ayer-1/blofin-sdk-python, Apache-2.0). It is not on
+# PyPI and PyPI refuses git-URL dependencies, so it is installed separately;
 # see "perpkit > Install" in the README.
 perps = ["numpy>=1.26"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]

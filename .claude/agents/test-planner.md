@@ -22,10 +22,13 @@ orders.
     resolved windows), `predkit.backtest` (`label_row`, `run`: non-overlapping
     holds, fees, shuffled-label control), `predkit.replay` (`rebuild`,
     `MakerFillModel`), `predkit.runner` (paper).
-  - Crypto perps (a crypto-perps module, if present): its cross-sectional
-    factor panels (daily and intraday), event-study harness, order-book replay
-    and any maker/lead-quote runner. If there is no such module, the first
-    steps are building the minimum harness, with tests, through local-tester.
+  - Crypto perps (`perpkit`): the recorders (`perpkit.record`,
+    `record_oi`, `record_hyperliquid`, `record_liquidations`), the funding
+    panels (`perpkit.analysis.panel_blofin` / `panel_hyperliquid`), the
+    cross-sectional factor harness (`perpkit.analysis.factor_panel`, lag 1 by
+    default), `perpkit.analysis.replay` / `audit_raw` for the raw archive, and
+    `perpkit/fees.py`. Anything missing (an event-study or maker-fill harness)
+    is built first, with tests, through local-tester.
 
 ## Check the data before planning around it
 
