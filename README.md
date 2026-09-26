@@ -28,6 +28,7 @@ shapes the whole package.
 - [Adding a strategy](#adding-a-strategy)
 - [Fee tables](#fee-tables)
 - [What is verified and what is not](#what-is-verified-and-what-is-not)
+- [Research lab (Claude Code agents)](#research-lab-claude-code-agents)
 - [Licence](#licence)
 
 ## Architecture: the rules that span files
@@ -371,6 +372,57 @@ price.
   delivered is still applied late. Filter crossed or locked touches before
   treating one as a price.
 - The maker fill model is a bracket, not a truth. Only live fills narrow it.
+
+## Research lab (Claude Code agents)
+
+`.claude/agents/` holds a team of [Claude Code](https://docs.claude.com/en/docs/claude-code)
+subagents that research strategies the way this toolkit backtests them: with
+costs first and goalposts fixed before the data is seen. They cover binary
+prediction markets and crypto perpetual futures (funding, basis, order flow;
+the perps side uses a crypto-perps module if you add one, or public data).
+
+The pipeline, one folder per idea under `research/` (see
+[research/BOARD.md](research/BOARD.md)):
+
+1. `strategy-scout` finds ideas in papers, venue docs and practitioner
+   write-ups and writes a sourced card.
+2. `strategy-theorist` turns a card or a hunch into a falsifiable hypothesis:
+   mechanism, counterparty, cost hurdle from the fee tables, a prediction that
+   can fail, and a prior.
+3. `test-planner` pre-registers the test: numeric kill criteria and the scoring
+   code's hash frozen before any out-of-sample data is fetched, controls
+   (shuffled-label mean), cost model, sample size, and which steps run locally
+   or remotely.
+4. `local-tester` builds the code through `lab-test-writer`,
+   `lab-code-writer` and `lab-code-reviewer`, which work from narrow briefs
+   and never see the hypothesis; the reviewer hunts look-ahead, overlapping
+   holds, cost errors and tests that can't fail. It then runs the plan and
+   scores it against the kill criteria.
+5. `remote-tester` (optional) runs latency-sensitive or long steps on a box
+   near the venue.
+6. `strategy-lab` orchestrates, and records every verdict (dead, promising,
+   needs-more-data) on the board, negative results included.
+
+**Using it.** The agents ship in the repo, so they are available whenever you
+run Claude Code here. Start the whole lab as the main session with
+`claude --agent strategy-lab`, then say "run the lab" or give it a topic. You
+can also call any agent on its own (e.g. ask for `strategy-theorist` on a
+hunch). Run the lab as the main session: its `tools: Agent(...)` list is the
+registry every nested agent draws from, so if you add an agent, list it there.
+
+**Safety.** The agents never place live or real-money orders. They use paper
+mode, or a venue's demo environment only where the repo supports one, and
+anything touching real money, keys or credentials goes back to you. They
+never read or log credentials. Code and runs need your approval; research and
+planning don't. Check each venue's terms and your jurisdiction before acting
+on any idea.
+
+**Configuring.** `remote-tester` is a template: fill in `<REMOTE_HOST>`,
+`<SSH_KEY_PATH>`, `<REMOTE_DIR>` and the other placeholders in
+`.claude/agents/remote-tester.md` before using it; until then it refuses and
+plans stay local. The `model:` (and `effort:`) line in each agent's
+frontmatter is a choice, not a requirement; change it to suit your plan or
+budget. On Windows you can add `PowerShell` to an agent's `tools:` list.
 
 ## Licence
 
