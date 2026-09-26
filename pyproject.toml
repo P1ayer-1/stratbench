@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "predkit"
+version = "0.1.0"
+description = "Record, replay and backtest strategies on Kalshi and Polymarket. Non-custodial, fee-honest."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28",
+    "websockets>=13",
+    "cryptography>=42",
+    "psutil>=6",
+]
+
+[project.optional-dependencies]
+# Signing Polymarket orders (EIP-712) for live trading. Not needed to record,
+# replay, backtest or paper trade.
+polymarket = ["py-clob-client>=0.30"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+predkit-record = "predkit.record:main"
+predkit-record-series = "predkit.record_series:main"
+predkit-label = "predkit.label:main"
+predkit-run = "predkit.runner:main"
+predkit-keys = "predkit.keys:main"
+
+[tool.setuptools.packages.find]
+include = ["predkit*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+asyncio_mode = "auto"

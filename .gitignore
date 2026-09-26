@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# Recorded market data and run logs: large, and yours
+data/
+data_*/
+
+# Secrets: never commit keys, passphrases or environment files
+.env
+.env.*
+*.keystore
+keys.json
+*.pem
+*.key
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
